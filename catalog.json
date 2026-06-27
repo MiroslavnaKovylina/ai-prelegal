@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Mutual Non-Disclosure Agreement",
+    "description": "Standard terms for a mutual NDA allowing both parties to share confidential information for a defined purpose, with protections for both the disclosing and receiving party.",
+    "filename": "templates/Mutual-NDA.md"
+  },
+  {
+    "name": "Mutual NDA Cover Page",
+    "description": "Cover page template to be completed by the parties when executing the Common Paper Mutual NDA, capturing purpose, effective date, term, governing law, and signatures.",
+    "filename": "templates/Mutual-NDA-coverpage.md"
+  },
+  {
+    "name": "Cloud Service Agreement",
+    "description": "Comprehensive standard terms for selling and buying cloud software and SaaS products, covering access, restrictions, privacy, payment, liability, and indemnification.",
+    "filename": "templates/CSA.md"
+  },
+  {
+    "name": "Design Partner Agreement",
+    "description": "Agreement for early product access in exchange for structured feedback and participation in a design partner program, with IP assignment of feedback to the provider.",
+    "filename": "templates/design-partner-agreement.md"
+  },
+  {
+    "name": "Service Level Agreement",
+    "description": "Defines uptime targets, response time commitments, and service credit remedies for cloud services, designed to be used alongside the Common Paper CSA.",
+    "filename": "templates/sla.md"
+  },
+  {
+    "name": "Professional Services Agreement",
+    "description": "Governs the provision of professional services and delivery of work products via SOWs, covering IP ownership, payment, indemnification, and confidentiality.",
+    "filename": "templates/psa.md"
+  },
+  {
+    "name": "Data Processing Agreement",
+    "description": "GDPR-compliant agreement for the processing of personal data by a provider on behalf of a customer, including EEA/UK standard contractual clauses and subprocessor rules.",
+    "filename": "templates/DPA.md"
+  },
+  {
+    "name": "Software License Agreement",
+    "description": "Standard terms for licensing on-premise or installable software to customers, covering installation rights, restrictions, warranties, and support obligations.",
+    "filename": "templates/Software-License-Agreement.md"
+  },
+  {
+    "name": "Partnership Agreement",
+    "description": "Governs cooperation, trademark licensing, payment, and mutual obligations between business partners, including confidentiality and indemnification provisions.",
+    "filename": "templates/Partnership-Agreement.md"
+  },
+  {
+    "name": "Pilot Agreement",
+    "description": "Short-term agreement for trials or evaluations of a product before a full commercial commitment, with limited warranties and easy termination rights.",
+    "filename": "templates/Pilot-Agreement.md"
+  },
+  {
+    "name": "Business Associate Agreement",
+    "description": "HIPAA-compliant agreement governing the handling of protected health information (PHI) by a business associate on behalf of a covered entity.",
+    "filename": "templates/BAA.md"
+  },
+  {
+    "name": "AI Addendum",
+    "description": "Addendum to a cloud service or software agreement governing the use of AI/ML services, including input/output ownership, model training restrictions, and AI-specific disclaimers.",
+    "filename": "templates/AI-Addendum.md"
+  }
+]
