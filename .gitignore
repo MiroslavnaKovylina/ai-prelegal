@@ -53,6 +53,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
+/package-lock.json
 package-lock.json.bak
 .yarn/cache
 .yarn/unplugged

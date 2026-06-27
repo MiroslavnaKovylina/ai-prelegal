@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { NDAFormData, PartyInfo, defaultFormData } from '@/types/nda'
+import { NDAFormData, PartyInfo } from '@/types/nda'
 
 interface Props {
-  initialData: NDAFormData
-  onSubmit: (data: NDAFormData) => void
+  data: NDAFormData
+  onChange: (data: NDAFormData) => void
 }
 
 function TextField({
@@ -66,28 +65,14 @@ function PartyFields({
   )
 }
 
-export default function NDAForm({ initialData, onSubmit }: Props) {
-  const [data, setData] = useState<NDAFormData>(initialData)
-
+export default function NDAForm({ data, onChange }: Props) {
   function update<K extends keyof NDAFormData>(key: K, value: NDAFormData[K]) {
-    setData((d) => ({ ...d, [key]: value }))
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    onSubmit(data)
+    onChange({ ...data, [key]: value })
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-12 px-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Mutual NDA Creator</h1>
-        <p className="mt-2 text-gray-500">
-          Fill in the details below to generate a completed Mutual Non-Disclosure Agreement.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="px-6 py-8">
+      <form className="space-y-6">
         {/* Agreement Details */}
         <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Agreement Details</h2>
@@ -211,12 +196,6 @@ export default function NDAForm({ initialData, onSubmit }: Props) {
           <PartyFields label="Party 2" value={data.party2} onChange={(v) => update('party2', v)} />
         </section>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-base transition-colors"
-        >
-          Generate NDA →
-        </button>
       </form>
     </div>
   )
