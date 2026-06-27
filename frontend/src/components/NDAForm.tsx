@@ -13,17 +13,20 @@ function TextField({
   onChange,
   type = 'text',
   placeholder,
+  id,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   type?: string
   placeholder?: string
+  id: string
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -38,10 +41,12 @@ function PartyFields({
   label,
   value,
   onChange,
+  idPrefix,
 }: {
   label: string
   value: PartyInfo
   onChange: (v: PartyInfo) => void
+  idPrefix: string
 }) {
   function update(field: keyof PartyInfo, val: string) {
     onChange({ ...value, [field]: val })
@@ -51,10 +56,11 @@ function PartyFields({
     <div className="space-y-4">
       <h3 className="font-semibold text-gray-800">{label}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TextField label="Full Name" value={value.name} onChange={(v) => update('name', v)} placeholder="Jane Smith" />
-        <TextField label="Title" value={value.title} onChange={(v) => update('title', v)} placeholder="CEO" />
-        <TextField label="Company" value={value.company} onChange={(v) => update('company', v)} placeholder="Acme Corp" />
+        <TextField id={`${idPrefix}-name`} label="Full Name" value={value.name} onChange={(v) => update('name', v)} placeholder="Jane Smith" />
+        <TextField id={`${idPrefix}-title`} label="Title" value={value.title} onChange={(v) => update('title', v)} placeholder="CEO" />
+        <TextField id={`${idPrefix}-company`} label="Company" value={value.company} onChange={(v) => update('company', v)} placeholder="Acme Corp" />
         <TextField
+          id={`${idPrefix}-address`}
           label="Notice Address (email or postal)"
           value={value.address}
           onChange={(v) => update('address', v)}
@@ -77,10 +83,11 @@ export default function NDAForm({ data, onChange }: Props) {
         <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Agreement Details</h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
               Purpose <span className="font-normal text-gray-400">— how confidential information may be used</span>
             </label>
             <textarea
+              id="purpose"
               value={data.purpose}
               onChange={(e) => update('purpose', e.target.value)}
               rows={3}
@@ -88,6 +95,7 @@ export default function NDAForm({ data, onChange }: Props) {
             />
           </div>
           <TextField
+            id="effective-date"
             label="Effective Date"
             value={data.effectiveDate}
             onChange={(v) => update('effectiveDate', v)}
@@ -174,12 +182,14 @@ export default function NDAForm({ data, onChange }: Props) {
           <h2 className="text-lg font-semibold text-gray-900">Governing Law & Jurisdiction</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TextField
+              id="governing-law"
               label="Governing Law (State)"
               value={data.governingLaw}
               onChange={(v) => update('governingLaw', v)}
               placeholder="e.g., Delaware"
             />
             <TextField
+              id="jurisdiction"
               label="Jurisdiction"
               value={data.jurisdiction}
               onChange={(v) => update('jurisdiction', v)}
@@ -191,9 +201,9 @@ export default function NDAForm({ data, onChange }: Props) {
         {/* Parties */}
         <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           <h2 className="text-lg font-semibold text-gray-900">Parties</h2>
-          <PartyFields label="Party 1" value={data.party1} onChange={(v) => update('party1', v)} />
+          <PartyFields idPrefix="party1" label="Party 1" value={data.party1} onChange={(v) => update('party1', v)} />
           <hr className="border-gray-100" />
-          <PartyFields label="Party 2" value={data.party2} onChange={(v) => update('party2', v)} />
+          <PartyFields idPrefix="party2" label="Party 2" value={data.party2} onChange={(v) => update('party2', v)} />
         </section>
 
       </form>

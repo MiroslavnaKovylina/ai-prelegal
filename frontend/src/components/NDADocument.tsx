@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react'
 import { NDAFormData } from '@/types/nda'
 
 interface Props {
   data: NDAFormData
 }
 
-function Val({ children }: { children: React.ReactNode }) {
+function Val({ children }: { children: ReactNode }) {
   return (
     <span className="font-semibold text-blue-700 underline decoration-dotted underline-offset-2">
       {children}
@@ -19,7 +20,7 @@ function CoverField({
 }: {
   label: string
   description?: string
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <div className="border border-gray-200 rounded-lg p-4">
@@ -203,8 +204,12 @@ export default function NDADocument({ data }: Props) {
             </p>
 
             <p>
-              <strong>5. Term and Termination.</strong> This MNDA commences on the <Val>{formattedDate}</Val> and
-              expires at the end of the <Val>{mndaTermText}</Val>. Either party may terminate this MNDA for any or no
+              <strong>5. Term and Termination.</strong> This MNDA commences on the <Val>{formattedDate}</Val> and{' '}
+              {mndaTermType === 'years' ? (
+                <>expires at the end of the <Val>{mndaTermText}</Val></>
+              ) : (
+                <><Val>{mndaTermText}</Val></>
+              )}. Either party may terminate this MNDA for any or no
               reason upon written notice to the other party. The Receiving Party's obligations relating to Confidential
               Information will survive for the <Val>{confidentialityTermText}</Val>, despite any expiration or
               termination of this MNDA.
