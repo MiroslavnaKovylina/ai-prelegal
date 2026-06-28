@@ -77,10 +77,10 @@ export default function NDAForm({ data, onChange }: Props) {
   }
 
   return (
-    <div className="px-6 py-8">
-      <form className="space-y-6">
+    <div className="px-5 py-5">
+      <form className="space-y-5">
         {/* Agreement Details */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">Agreement Details</h2>
           <div>
             <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
@@ -104,7 +104,7 @@ export default function NDAForm({ data, onChange }: Props) {
         </section>
 
         {/* Terms */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Terms</h2>
 
           <div>
@@ -178,7 +178,7 @@ export default function NDAForm({ data, onChange }: Props) {
         </section>
 
         {/* Legal */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">Governing Law & Jurisdiction</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <TextField
@@ -199,7 +199,7 @@ export default function NDAForm({ data, onChange }: Props) {
         </section>
 
         {/* Parties */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Parties</h2>
           <PartyFields idPrefix="party1" label="Party 1" value={data.party1} onChange={(v) => update('party1', v)} />
           <hr className="border-gray-100" />

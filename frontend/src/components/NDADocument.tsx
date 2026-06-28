@@ -69,8 +69,8 @@ export default function NDADocument({ data }: Props) {
   const jur = jurisdiction || '[Jurisdiction]'
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6 print:py-0 print:px-0">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-10 space-y-10 print:shadow-none print:border-none print:rounded-none print:p-8">
+    <div className="w-full py-6 px-4 print:py-0 print:px-0">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8 space-y-8 print:shadow-none print:border-none print:rounded-none print:p-8">
 
         {/* Title */}
         <div className="text-center space-y-1">
@@ -158,7 +158,7 @@ export default function NDADocument({ data }: Props) {
         <div className="space-y-6">
           <h2 className="text-xl font-bold text-gray-900">Standard Terms</h2>
 
-          <div className="space-y-4 text-sm text-gray-800 leading-relaxed">
+          <div className="space-y-4 text-base text-gray-800 leading-relaxed">
             <p>
               <strong>1. Introduction.</strong> This Mutual Non-Disclosure Agreement (which incorporates these Standard
               Terms and the Cover Page) ("<strong>MNDA</strong>") allows each party ("
