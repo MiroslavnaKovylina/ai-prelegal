@@ -1,25 +1,129 @@
-import json
+import re
 from typing import Optional
 
 from litellm import completion
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 MODEL = "openrouter/openai/gpt-oss-120b"
 EXTRA_BODY = {"provider": {"order": ["cerebras"]}}
 
+# ── Field name lists ────────────────────────────────────────────────────────
+# Keys must match the span text content in the matching template file exactly.
+
+_NDA = [
+    "Purpose", "Effective Date", "MNDA Term", "Term of Confidentiality",
+    "Governing Law", "Jurisdiction",
+    "Party 1 Name", "Party 1 Title", "Party 1 Company", "Party 1 Address",
+    "Party 2 Name", "Party 2 Title", "Party 2 Company", "Party 2 Address",
+]
+
+_CSA = [
+    "Customer", "Provider", "Effective Date", "Subscription Period",
+    "Payment Process", "Order Date", "Non-Renewal Notice Date",
+    "General Cap Amount", "Governing Law", "Chosen Courts",
+]
+
+_DESIGN_PARTNER = [
+    "Partner", "Provider", "Effective Date", "Term", "Fees", "Program",
+    "Governing Law", "Chosen Courts", "Notice Address",
+]
+
+_SLA = [
+    "Provider", "Customer", "Target Uptime", "Target Response Time",
+    "Support Channel", "Subscription Period",
+    "Uptime Credit", "Response Time Credit", "Scheduled Downtime",
+]
+
+_PSA = [
+    "Customer", "Provider", "Effective Date", "Governing Law",
+    "Chosen Courts", "General Cap Amount", "Security Policy",
+]
+
+_DPA = [
+    "Customer", "Provider", "Effective Date",
+    "Categories of Personal Data", "Categories of Data Subjects",
+    "Nature and Purpose of Processing", "Duration of Processing",
+    "Governing Member State", "Security Policy",
+]
+
+_SOFTWARE_LICENSE = [
+    "Provider", "Customer", "Effective Date", "Subscription Period",
+    "Permitted Uses", "Governing Law", "Chosen Courts", "General Cap Amount",
+]
+
+_PARTNERSHIP = [
+    "Company", "Partner", "Effective Date", "Territory",
+    "Payment Process", "Payment Schedule", "Governing Law", "Chosen Courts",
+]
+
+_PILOT = [
+    "Customer", "Provider", "Effective Date", "Pilot Period",
+    "Governing Law", "Chosen Courts", "General Cap Amount", "Notice Address",
+]
+
+_BAA = [
+    "Provider", "Company", "BAA Effective Date", "Agreement",
+    "Limitations", "Breach Notification Period",
+]
+
+_AI_ADDENDUM = [
+    "Customer", "Provider", "Effective Date",
+    "Training Data", "Training Purposes",
+    "Training Restrictions", "Improvement Restrictions",
+]
+
+DOCUMENT_FIELD_NAMES: dict[str, list[str]] = {
+    "mutual-nda":                  _NDA,
+    "mutual-nda-coverpage":        _NDA,
+    "csa":                         _CSA,
+    "design-partner-agreement":    _DESIGN_PARTNER,
+    "sla":                         _SLA,
+    "psa":                         _PSA,
+    "dpa":                         _DPA,
+    "software-license-agreement":  _SOFTWARE_LICENSE,
+    "partnership-agreement":       _PARTNERSHIP,
+    "pilot-agreement":             _PILOT,
+    "baa":                         _BAA,
+    "ai-addendum":                 _AI_ADDENDUM,
+}
+
+# ── Dynamic model builder ───────────────────────────────────────────────────
+
+class _AliasedBase(BaseModel):
+    """Base that allows both alias and python-name population."""
+    model_config = ConfigDict(populate_by_name=True)
+
+
+def _python_name(alias: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", alias.lower()).strip("_")
+
+
+_model_cache: dict[str, type[BaseModel]] = {}
+
+
+def _fields_model(field_names: list[str]) -> type[BaseModel]:
+    """Return a cached Pydantic model with one Optional[str] field per name."""
+    cache_key = "|".join(field_names)
+    if cache_key not in _model_cache:
+        defns = {
+            _python_name(n): (Optional[str], Field(None, alias=n))
+            for n in field_names
+        }
+        _model_cache[cache_key] = create_model(
+            "DocumentFields", __base__=_AliasedBase, **defns
+        )
+    return _model_cache[cache_key]
+
+
+# ── System prompts ──────────────────────────────────────────────────────────
+
 SUPPORTED_DOCS = [
-    "Mutual Non-Disclosure Agreement",
-    "Mutual NDA Cover Page",
-    "Cloud Service Agreement",
-    "Design Partner Agreement",
-    "Service Level Agreement",
-    "Professional Services Agreement",
-    "Data Processing Agreement",
-    "Software License Agreement",
-    "Partnership Agreement",
-    "Pilot Agreement",
-    "Business Associate Agreement",
-    "AI Addendum",
+    "Mutual Non-Disclosure Agreement", "Mutual NDA Cover Page",
+    "Cloud Service Agreement", "Design Partner Agreement",
+    "Service Level Agreement", "Professional Services Agreement",
+    "Data Processing Agreement", "Software License Agreement",
+    "Partnership Agreement", "Pilot Agreement",
+    "Business Associate Agreement", "AI Addendum",
 ]
 
 _SUPPORTED_LIST = "\n".join(f"- {d}" for d in SUPPORTED_DOCS)
@@ -30,171 +134,103 @@ Rules:
 - On the first turn (no prior messages), greet the user warmly and ask your first question.
 - Ask about one or two topics at a time. Never list many questions at once.
 - ALWAYS end your reply with a follow-up question if any fields are still missing.
-- If the user asks for a document type not listed here, explain that this platform supports only:
+- If the user asks for a document type not supported here, explain that this platform supports:
 {_SUPPORTED_LIST}
   Then offer to continue with the current document.
 - Acknowledge corrections naturally when the user updates a previous answer.
 - When all key fields are collected, confirm with a summary and tell the user they can download the PDF.
 
-Output format (JSON):
-{{
-  "message": "<your natural language reply>",
-  "fields": {{
-    "<Exact Field Name>": "<value or null>"
-  }}
-}}
-Only include fields you determined or updated in THIS turn; omit or set others to null.
-All date fields must be ISO format YYYY-MM-DD.
+Structured output rules:
+- `message`: your natural language reply shown in chat.
+- `fields`: set ONLY the fields you determined or updated in THIS turn. Leave all others null.
+- All date fields must be ISO format YYYY-MM-DD.
 """
 
-_NDA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Purpose": why the parties are sharing confidential information
-- "Effective Date": when the agreement starts (YYYY-MM-DD)
-- "MNDA Term": e.g. "1 year from Effective Date" or "until terminated"
-- "Term of Confidentiality": e.g. "3 years from Effective Date" or "in perpetuity"
-- "Governing Law": US state governing the agreement
-- "Jurisdiction": city/county where legal disputes are resolved
-- "Party 1 Name", "Party 1 Title", "Party 1 Company", "Party 1 Address"
-- "Party 2 Name", "Party 2 Title", "Party 2 Company", "Party 2 Address"
+_NDA_PROMPT = _BASE + """
+Document: Mutual Non-Disclosure Agreement (MNDA)
+Collect: Purpose, Effective Date, MNDA Term (e.g. "1 year from Effective Date" or "until terminated"),
+Term of Confidentiality (e.g. "3 years from Effective Date" or "in perpetuity"),
+Governing Law (US state), Jurisdiction (city/county),
+Party 1 Name / Title / Company / Address, Party 2 Name / Title / Company / Address.
 """
 
-_CSA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Customer": customer company name
-- "Provider": provider/vendor company name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Subscription Period": e.g. "1 year"
-- "Payment Process": e.g. "annual upfront", "monthly invoiced"
-- "Order Date": order placement date (YYYY-MM-DD)
-- "Non-Renewal Notice Date": cancellation deadline, e.g. "30 days before period end"
-- "General Cap Amount": liability cap amount
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
+_CSA_PROMPT = _BASE + """
+Document: Cloud Service Agreement (CSA)
+Collect: Customer, Provider, Effective Date, Subscription Period, Payment Process,
+Order Date, Non-Renewal Notice Date, General Cap Amount, Governing Law, Chosen Courts.
 """
 
-_DESIGN_PARTNER_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Partner": design partner company name
-- "Provider": product provider company name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Term": duration, e.g. "6 months", "1 year"
-- "Fees": fees partner pays (or "None" if free)
-- "Program": name/description of the design partner program
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
-- "Notice Address": contact address for formal notices
+_DESIGN_PARTNER_PROMPT = _BASE + """
+Document: Design Partner Agreement
+Collect: Partner, Provider, Effective Date, Term, Fees (or "None"),
+Program (description of design-partner program), Governing Law, Chosen Courts, Notice Address.
 """
 
-_SLA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Provider": service provider name
-- "Customer": customer name
-- "Target Uptime": e.g. "99.9%"
-- "Target Response Time": e.g. "4 hours for critical issues"
-- "Support Channel": e.g. "email", "support portal"
-- "Subscription Period": period covered, e.g. "1 year"
-- "Uptime Credit": credit for missing uptime SLA, e.g. "10% of monthly fees"
-- "Response Time Credit": credit for missing response time SLA
-- "Scheduled Downtime": allowed maintenance windows
+_SLA_PROMPT = _BASE + """
+Document: Service Level Agreement (SLA)
+Collect: Provider, Customer, Target Uptime (e.g. "99.9%"), Target Response Time,
+Support Channel, Subscription Period, Uptime Credit, Response Time Credit, Scheduled Downtime.
 """
 
-_PSA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Customer": customer company name
-- "Provider": service provider company name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
-- "General Cap Amount": liability cap amount
-- "Security Policy": provider security policy name or URL
+_PSA_PROMPT = _BASE + """
+Document: Professional Services Agreement (PSA)
+Collect: Customer, Provider, Effective Date, Governing Law, Chosen Courts,
+General Cap Amount, Security Policy.
 """
 
-_DPA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Customer": data controller (customer) name
-- "Provider": data processor (provider) name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Categories of Personal Data": types of data processed, e.g. "names, email addresses"
-- "Categories of Data Subjects": whose data is processed, e.g. "employees, end users"
-- "Nature and Purpose of Processing": why data is processed
-- "Duration of Processing": how long data is processed
-- "Governing Member State": EU member state governing the agreement
-- "Security Policy": provider security policy name or URL
+_DPA_PROMPT = _BASE + """
+Document: Data Processing Agreement (DPA)
+Collect: Customer, Provider, Effective Date, Categories of Personal Data,
+Categories of Data Subjects, Nature and Purpose of Processing,
+Duration of Processing, Governing Member State, Security Policy.
 """
 
-_SOFTWARE_LICENSE_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Provider": software licensor name
-- "Customer": licensee name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Subscription Period": license duration, e.g. "1 year", "perpetual"
-- "Permitted Uses": how customer may use the software
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
-- "General Cap Amount": liability cap amount
+_SOFTWARE_LICENSE_PROMPT = _BASE + """
+Document: Software License Agreement
+Collect: Provider, Customer, Effective Date, Subscription Period,
+Permitted Uses, Governing Law, Chosen Courts, General Cap Amount.
 """
 
-_PARTNERSHIP_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Company": primary company name
-- "Partner": partner company name
-- "Effective Date": agreement start date (YYYY-MM-DD)
-- "Territory": geographic scope, e.g. "North America", "worldwide"
-- "Payment Process": how payments are made
-- "Payment Schedule": payment frequency, e.g. "monthly", "quarterly"
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
+_PARTNERSHIP_PROMPT = _BASE + """
+Document: Partnership Agreement
+Collect: Company, Partner, Effective Date, Territory, Payment Process,
+Payment Schedule, Governing Law, Chosen Courts.
 """
 
-_PILOT_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Customer": pilot participant name
-- "Provider": provider company name
-- "Effective Date": pilot start date (YYYY-MM-DD)
-- "Pilot Period": duration, e.g. "30 days", "3 months"
-- "Governing Law": US state governing the agreement
-- "Chosen Courts": courts with jurisdiction
-- "General Cap Amount": liability cap amount
-- "Notice Address": contact address for formal notices
+_PILOT_PROMPT = _BASE + """
+Document: Pilot Agreement
+Collect: Customer, Provider, Effective Date, Pilot Period,
+Governing Law, Chosen Courts, General Cap Amount, Notice Address.
 """
 
-_BAA_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Provider": business associate name (handles PHI)
-- "Company": covered entity name
-- "BAA Effective Date": when this BAA takes effect (YYYY-MM-DD)
-- "Agreement": name/reference to the main services agreement this BAA supplements
-- "Limitations": restrictions on PHI use beyond defaults (or "None")
-- "Breach Notification Period": time to report breaches, e.g. "30 days", "72 hours"
+_BAA_PROMPT = _BASE + """
+Document: Business Associate Agreement (BAA)
+Collect: Provider, Company, BAA Effective Date, Agreement (the main services agreement this BAA supplements),
+Limitations (or "None"), Breach Notification Period (e.g. "30 days").
 """
 
-_AI_ADDENDUM_FIELDS = """
-Fields to collect (use these EXACT key names):
-- "Customer": customer name
-- "Provider": AI service provider name
-- "Effective Date": addendum start date (YYYY-MM-DD)
-- "Training Data": description of customer data that may be used for model training
-- "Training Purposes": permitted purposes for model training
-- "Training Restrictions": any restrictions on using data for training
-- "Improvement Restrictions": restrictions on using data to improve AI models
+_AI_ADDENDUM_PROMPT = _BASE + """
+Document: AI Addendum
+Collect: Customer, Provider, Effective Date, Training Data,
+Training Purposes, Training Restrictions, Improvement Restrictions.
 """
 
 DOCUMENT_REGISTRY: dict[str, str] = {
-    "mutual-nda": _BASE + "\nDocument: Mutual Non-Disclosure Agreement (MNDA)\n" + _NDA_FIELDS,
-    "mutual-nda-coverpage": _BASE + "\nDocument: Mutual NDA Cover Page\n" + _NDA_FIELDS,
-    "csa": _BASE + "\nDocument: Cloud Service Agreement (CSA)\n" + _CSA_FIELDS,
-    "design-partner-agreement": _BASE + "\nDocument: Design Partner Agreement\n" + _DESIGN_PARTNER_FIELDS,
-    "sla": _BASE + "\nDocument: Service Level Agreement (SLA)\n" + _SLA_FIELDS,
-    "psa": _BASE + "\nDocument: Professional Services Agreement (PSA)\n" + _PSA_FIELDS,
-    "dpa": _BASE + "\nDocument: Data Processing Agreement (DPA)\n" + _DPA_FIELDS,
-    "software-license-agreement": _BASE + "\nDocument: Software License Agreement\n" + _SOFTWARE_LICENSE_FIELDS,
-    "partnership-agreement": _BASE + "\nDocument: Partnership Agreement\n" + _PARTNERSHIP_FIELDS,
-    "pilot-agreement": _BASE + "\nDocument: Pilot Agreement\n" + _PILOT_FIELDS,
-    "baa": _BASE + "\nDocument: Business Associate Agreement (BAA)\n" + _BAA_FIELDS,
-    "ai-addendum": _BASE + "\nDocument: AI Addendum\n" + _AI_ADDENDUM_FIELDS,
+    "mutual-nda":                  _NDA_PROMPT,
+    "mutual-nda-coverpage":        _NDA_PROMPT,
+    "csa":                         _CSA_PROMPT,
+    "design-partner-agreement":    _DESIGN_PARTNER_PROMPT,
+    "sla":                         _SLA_PROMPT,
+    "psa":                         _PSA_PROMPT,
+    "dpa":                         _DPA_PROMPT,
+    "software-license-agreement":  _SOFTWARE_LICENSE_PROMPT,
+    "partnership-agreement":       _PARTNERSHIP_PROMPT,
+    "pilot-agreement":             _PILOT_PROMPT,
+    "baa":                         _BAA_PROMPT,
+    "ai-addendum":                 _AI_ADDENDUM_PROMPT,
 }
 
+# ── Public API ──────────────────────────────────────────────────────────────
 
 class ChatTurn(BaseModel):
     message: str
@@ -202,14 +238,27 @@ class ChatTurn(BaseModel):
 
 
 def get_chat_response(messages: list[dict], document_type: str) -> ChatTurn:
-    system_prompt = DOCUMENT_REGISTRY.get(document_type, DOCUMENT_REGISTRY["mutual-nda"])
+    system_prompt = DOCUMENT_REGISTRY.get(document_type, _NDA_PROMPT)
+    field_names = DOCUMENT_FIELD_NAMES.get(document_type, _NDA)
+    FieldsModel = _fields_model(field_names)
+
+    class _ChatTurn(BaseModel):
+        message: str
+        fields: FieldsModel  # type: ignore[valid-type]
+
     full_messages = [{"role": "system", "content": system_prompt}] + messages
     response = completion(
         model=MODEL,
         messages=full_messages,
-        response_format={"type": "json_object"},
+        response_format=_ChatTurn,
         reasoning_effort="low",
         extra_body=EXTRA_BODY,
     )
-    data = json.loads(response.choices[0].message.content)
-    return ChatTurn(message=data["message"], fields=data.get("fields") or {})
+    result = _ChatTurn.model_validate_json(response.choices[0].message.content)
+    # Serialise with aliases so keys match template span names exactly
+    non_null = {
+        k: v
+        for k, v in result.fields.model_dump(by_alias=True).items()
+        if v is not None
+    }
+    return ChatTurn(message=result.message, fields=non_null)
