@@ -97,7 +97,7 @@ describe('Document selection', () => {
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument()
   })
 
-  it('shows the document name in the header after selection', async () => {
+  it('shows the document name as title in the header after selection', async () => {
     const user = userEvent.setup()
     render(<Home />)
     await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
@@ -106,8 +106,8 @@ describe('Document selection', () => {
 
     await waitFor(() =>
       expect(
-        screen.getAllByText('Mutual Non-Disclosure Agreement').length
-      ).toBeGreaterThanOrEqual(1)
+        screen.getByText('Mutual Non-Disclosure Agreement Creator')
+      ).toBeInTheDocument()
     )
   })
 

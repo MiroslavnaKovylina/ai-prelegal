@@ -32,10 +32,10 @@ export default function Home() {
         <header className="bg-white border-b border-gray-200">
           <div className="max-w-5xl mx-auto px-6 py-4">
             <h1 className="text-2xl font-bold" style={{ color: '#032147' }}>
-              AI Legal Document Creator
+              Legal Document Creator
             </h1>
             <p className="text-sm mt-1" style={{ color: '#888888' }}>
-              Select a document type to get started
+              Create professional legal documents with AI assistance.
             </p>
           </div>
         </header>
@@ -80,9 +80,14 @@ export default function Home() {
             >
               ← Back
             </button>
-            <h1 className="text-xl font-semibold" style={{ color: '#032147' }}>
-              {selected.name}
-            </h1>
+            <div>
+              <h1 className="text-xl font-semibold leading-tight" style={{ color: '#032147' }}>
+                {selected.name} Creator
+              </h1>
+              <p className="text-xs" style={{ color: '#888888' }}>
+                Create a professional {selected.name} with AI assistance.
+              </p>
+            </div>
           </div>
           <button
             onClick={() => window.print()}
