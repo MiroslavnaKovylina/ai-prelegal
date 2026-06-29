@@ -15,6 +15,8 @@ COPY backend/pyproject.toml ./
 RUN uv sync --no-dev --no-install-project
 
 COPY backend/ ./
+COPY catalog.json /app/catalog.json
+COPY templates/ /app/templates/
 
 # Copy built frontend into backend/static/
 COPY --from=frontend-builder /app/out ./static/

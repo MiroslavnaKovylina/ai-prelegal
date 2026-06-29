@@ -3,133 +3,205 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Home from '@/app/page'
 
-const GREETING = "Hello! I'll help you fill in your Mutual NDA. What is the purpose of this agreement?"
+// Mock DocumentRenderer to avoid ESM issues with react-markdown in Jest
+jest.mock('@/components/DocumentRenderer', () => ({
+  __esModule: true,
+  default: ({ filename, data }: { filename: string; data: Record<string, string | undefined> }) => (
+    <div data-testid="document-renderer" data-filename={filename}>
+      {Object.entries(data).map(([k, v]) => v ? <span key={k}>{v}</span> : null)}
+    </div>
+  ),
+}))
 
-function makeFetchResponse(fields: Record<string, unknown> = {}) {
+const CATALOG = [
+  {
+    id: 'mutual-nda',
+    name: 'Mutual Non-Disclosure Agreement',
+    description: 'Standard terms for a mutual NDA.',
+    filename: 'templates/Mutual-NDA.md',
+  },
+  {
+    id: 'csa',
+    name: 'Cloud Service Agreement',
+    description: 'Comprehensive terms for cloud software.',
+    filename: 'templates/CSA.md',
+  },
+]
+
+const GREETING = "Hello! I'll help you fill out this document. What is the purpose of this agreement?"
+
+function makeChatResponse(fields: Record<string, string | null> = {}) {
   return {
-    json: jest.fn().mockResolvedValue({
-      message: GREETING,
-      fields: {
-        purpose: null, effectiveDate: null,
-        mndaTermType: null, mndaTermYears: null,
-        confidentialityTermType: null, confidentialityTermYears: null,
-        governingLaw: null, jurisdiction: null,
-        party1: null, party2: null,
-        ...fields,
-      },
-    }),
+    json: jest.fn().mockResolvedValue({ message: GREETING, fields }),
   }
 }
 
+function makeCatalogResponse() {
+  return {
+    json: jest.fn().mockResolvedValue(CATALOG),
+  }
+}
+
+function mockFetch(chatFields: Record<string, string | null> = {}) {
+  ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+    if (url === '/api/catalog') return Promise.resolve(makeCatalogResponse())
+    if (url === '/api/chat') return Promise.resolve(makeChatResponse(chatFields))
+    return Promise.reject(new Error(`Unexpected fetch: ${url}`))
+  })
+}
+
 beforeEach(() => {
-  global.fetch = jest.fn().mockResolvedValue(makeFetchResponse()) as jest.Mock
+  global.fetch = jest.fn() as jest.Mock
+  mockFetch()
 })
 
 afterEach(() => {
   jest.resetAllMocks()
 })
 
-describe('Home page', () => {
-  describe('layout', () => {
-    it('renders the Mutual NDA Creator header', () => {
-      render(<Home />)
-      expect(screen.getByRole('heading', { name: 'Mutual NDA Creator' })).toBeInTheDocument()
-    })
+describe('Landing page', () => {
+  it('renders document catalog cards', async () => {
+    render(<Home />)
+    await waitFor(() =>
+      expect(screen.getByText('Mutual Non-Disclosure Agreement')).toBeInTheDocument()
+    )
+    expect(screen.getByText('Cloud Service Agreement')).toBeInTheDocument()
+  })
 
-    it('renders the Download PDF button', () => {
-      render(<Home />)
-      expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument()
-    })
+  it('shows document descriptions', async () => {
+    render(<Home />)
+    await waitFor(() =>
+      expect(screen.getByText('Standard terms for a mutual NDA.')).toBeInTheDocument()
+    )
+  })
 
-    it('renders the chat input', () => {
-      render(<Home />)
-      expect(screen.getByPlaceholderText('Type a message…')).toBeInTheDocument()
-    })
+  it('shows loading state before catalog loads', () => {
+    ;(global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {}))
+    render(<Home />)
+    expect(screen.getByText('Loading documents…')).toBeInTheDocument()
+  })
+})
 
-    it('renders the document preview panel with NDA heading', () => {
-      render(<Home />)
+describe('Document selection', () => {
+  it('navigates to chat view when a card is clicked', async () => {
+    const user = userEvent.setup()
+    render(<Home />)
+    await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
+
+    await user.click(screen.getByText('Mutual Non-Disclosure Agreement'))
+
+    await waitFor(() =>
+      expect(screen.getByText(GREETING)).toBeInTheDocument()
+    )
+    expect(screen.getByPlaceholderText('Type a message…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument()
+  })
+
+  it('shows the document name as title in the header after selection', async () => {
+    const user = userEvent.setup()
+    render(<Home />)
+    await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
+
+    await user.click(screen.getByText('Mutual Non-Disclosure Agreement'))
+
+    await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /Mutual Non-Disclosure Agreement/i, level: 1 })
+        screen.getByText('Mutual Non-Disclosure Agreement Creator')
       ).toBeInTheDocument()
-    })
+    )
   })
 
-  describe('NDA document default state', () => {
-    it('shows default purpose text in the document preview', () => {
-      render(<Home />)
-      expect(
-        screen.getAllByText('Evaluating whether to enter into a business relationship with the other party.').length
-      ).toBeGreaterThanOrEqual(1)
-    })
+  it('returns to landing page when Back is clicked', async () => {
+    const user = userEvent.setup()
+    render(<Home />)
+    await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
 
-    it('shows [State] and [Jurisdiction] placeholders when fields are empty', () => {
-      render(<Home />)
-      const section9 = screen.getByText(/9\. Governing Law and Jurisdiction\./).closest('p')!
-      expect(section9.textContent).toContain('[State]')
-      expect(section9.textContent).toContain('[Jurisdiction]')
-    })
+    await user.click(screen.getAllByText('Mutual Non-Disclosure Agreement')[0])
+    await waitFor(() => screen.getByRole('button', { name: '← Back' }))
+
+    await user.click(screen.getByRole('button', { name: '← Back' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Cloud Service Agreement')).toBeInTheDocument()
+    )
   })
+})
 
-  describe('AI chat', () => {
-    it('calls /api/chat on mount with empty messages', async () => {
-      render(<Home />)
-      await waitFor(() =>
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/chat',
-          expect.objectContaining({ method: 'POST', body: JSON.stringify({ messages: [] }) })
-        )
-      )
-    })
+describe('Chat in document view', () => {
+  async function openDoc(user: ReturnType<typeof userEvent.setup>) {
+    render(<Home />)
+    await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
+    await user.click(screen.getAllByText('Mutual Non-Disclosure Agreement')[0])
+    await waitFor(() => screen.getByText(GREETING))
+  }
 
-    it('displays the AI greeting after mount', async () => {
-      render(<Home />)
-      await waitFor(() => expect(screen.getByText(GREETING)).toBeInTheDocument())
-    })
+  it('calls /api/chat with document_type on mount', async () => {
+    const user = userEvent.setup()
+    await openDoc(user)
 
-    it('sends user message and shows it in the chat', async () => {
-      const user = userEvent.setup()
-      ;(global.fetch as jest.Mock)
-        .mockResolvedValueOnce(makeFetchResponse())
-        .mockResolvedValueOnce(makeFetchResponse())
-
-      render(<Home />)
-      await waitFor(() => screen.getByText(GREETING))
-
-      await user.type(screen.getByPlaceholderText('Type a message…'), 'Exploring a partnership')
-      await user.click(screen.getByRole('button', { name: 'Send' }))
-
-      await waitFor(() =>
-        expect(screen.getByText('Exploring a partnership')).toBeInTheDocument()
-      )
-    })
-
-    it('merges AI-returned fields into the NDA document', async () => {
-      const user = userEvent.setup()
-      ;(global.fetch as jest.Mock)
-        .mockResolvedValueOnce(makeFetchResponse())
-        .mockResolvedValueOnce(makeFetchResponse({ governingLaw: 'Nevada' }))
-
-      render(<Home />)
-      await waitFor(() => screen.getByText(GREETING))
-
-      await user.type(screen.getByPlaceholderText('Type a message…'), 'Nevada law governs')
-      await user.click(screen.getByRole('button', { name: 'Send' }))
-
-      await waitFor(() => {
-        const section9 = screen.getByText(/9\. Governing Law and Jurisdiction\./).closest('p')!
-        expect(section9.textContent).toContain('Nevada')
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/chat',
+      expect.objectContaining({
+        body: JSON.stringify({ messages: [], document_type: 'mutual-nda' }),
       })
-    })
+    )
   })
 
-  describe('Download PDF button', () => {
-    it('calls window.print() when clicked', async () => {
-      const user = userEvent.setup()
-      const printSpy = jest.spyOn(window, 'print').mockImplementation(() => {})
-      render(<Home />)
-      await user.click(screen.getByRole('button', { name: 'Download PDF' }))
-      expect(printSpy).toHaveBeenCalledTimes(1)
-      printSpy.mockRestore()
+  it('sends user message and shows it in chat', async () => {
+    const user = userEvent.setup()
+    await openDoc(user)
+
+    await user.type(screen.getByPlaceholderText('Type a message…'), 'Partnership exploration')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Partnership exploration')).toBeInTheDocument()
+    )
+  })
+
+  it('passes field values down to the document renderer', async () => {
+    const user = userEvent.setup()
+    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url === '/api/catalog') return Promise.resolve(makeCatalogResponse())
+      if (url === '/api/chat') {
+        return Promise.resolve(
+          makeChatResponse({ 'Governing Law': 'Nevada' })
+        )
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`))
     })
+
+    render(<Home />)
+    await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
+    await user.click(screen.getAllByText('Mutual Non-Disclosure Agreement')[0])
+
+    await waitFor(() =>
+      expect(screen.getByTestId('document-renderer')).toBeInTheDocument()
+    )
+
+    await user.type(screen.getByPlaceholderText('Type a message…'), 'Nevada governs')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Nevada')).toBeInTheDocument()
+    )
+  })
+
+  it('renders the document renderer with the correct filename', async () => {
+    const user = userEvent.setup()
+    await openDoc(user)
+
+    const renderer = screen.getByTestId('document-renderer')
+    expect(renderer).toHaveAttribute('data-filename', 'templates/Mutual-NDA.md')
+  })
+
+  it('calls window.print() when Download PDF is clicked', async () => {
+    const user = userEvent.setup()
+    const printSpy = jest.spyOn(window, 'print').mockImplementation(() => {})
+    await openDoc(user)
+
+    await user.click(screen.getByRole('button', { name: 'Download PDF' }))
+    expect(printSpy).toHaveBeenCalledTimes(1)
+    printSpy.mockRestore()
   })
 })

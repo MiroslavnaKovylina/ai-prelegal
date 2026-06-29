@@ -35,4 +35,8 @@ body {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+
+  mark {
+    display: none !important;
+  }
 }

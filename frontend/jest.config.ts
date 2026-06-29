@@ -13,6 +13,9 @@ const config: Config = {
     '!src/app/favicon.ico',
   ],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
 }
 
 export default createJestConfig(config)
