@@ -15,13 +15,33 @@ function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function normalizeKey(k: string) {
+  return k.toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function substituteFields(template: string, data: DocumentData): string {
+  // Build map: normalised name → exact span text content from the template
+  const spanIndex = new Map<string, string>()
+  const scanRe = /<span class="[^"]*_link">([^<]+)<\/span>/g
+  let m
+  while ((m = scanRe.exec(template)) !== null) {
+    spanIndex.set(normalizeKey(m[1]), m[1])
+  }
+
   let result = template
   for (const [key, value] of Object.entries(data)) {
     if (!value) continue
-    const re = new RegExp(`<span class="[^"]*_link">${escapeRegex(key)}</span>`, 'g')
-    result = result.replace(re, `<strong>${value}</strong>`)
+    // Resolve the exact span text by normalised lookup, fall back to key itself
+    const spanName = spanIndex.get(normalizeKey(key)) ?? key
+    const re = new RegExp(`<span class="[^"]*_link">${escapeRegex(spanName)}</span>`, 'gi')
+    result = result.replace(re, `<strong>${escapeHtml(value)}</strong>`)
   }
+
+  // Highlight still-unfilled placeholders
   result = result.replace(
     /<span class="[^"]*_link">([^<]+)<\/span>/g,
     '<mark>$1</mark>'

@@ -212,4 +212,4 @@ def get_chat_response(messages: list[dict], document_type: str) -> ChatTurn:
         extra_body=EXTRA_BODY,
     )
     data = json.loads(response.choices[0].message.content)
-    return ChatTurn(message=data["message"], fields=data.get("fields", {}))
+    return ChatTurn(message=data["message"], fields=data.get("fields") or {})
