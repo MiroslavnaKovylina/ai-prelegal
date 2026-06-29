@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { NDAFormData } from '@/types/nda'
+import { DocumentData } from '@/types/document'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -9,32 +9,35 @@ interface Message {
 }
 
 interface Props {
-  data: NDAFormData
-  onChange: (data: NDAFormData) => void
+  data: DocumentData
+  documentType: string
+  onChange: (data: DocumentData) => void
 }
 
-function merge(current: NDAFormData, patch: Record<string, unknown>): NDAFormData {
+function merge(current: DocumentData, patch: Record<string, unknown>): DocumentData {
   const next = { ...current }
   for (const [k, v] of Object.entries(patch)) {
     if (v == null) continue
-    if (k === 'party1' || k === 'party2') {
-      const updates = v as Record<string, unknown>
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      const sub = v as Record<string, unknown>
+      const existing = (current[k] as Record<string, unknown> | undefined) ?? {}
       next[k] = {
-        ...current[k],
-        ...Object.fromEntries(Object.entries(updates).filter(([, val]) => val != null)),
-      }
+        ...existing,
+        ...Object.fromEntries(Object.entries(sub).filter(([, val]) => val != null)),
+      } as unknown as string
     } else {
-      (next as Record<string, unknown>)[k] = v
+      next[k] = String(v)
     }
   }
   return next
 }
 
-export default function ChatPanel({ data, onChange }: Props) {
+export default function ChatPanel({ data, documentType, onChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const dataRef = useRef(data)
 
   useEffect(() => { dataRef.current = data }, [data])
@@ -54,13 +57,14 @@ export default function ChatPanel({ data, onChange }: Props) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: msgs }),
+        body: JSON.stringify({ messages: msgs, document_type: documentType }),
       })
       const { message, fields } = await res.json()
       setMessages(prev => [...prev, { role: 'assistant', content: message }])
       onChange(merge(dataRef.current, fields))
     } finally {
       setLoading(false)
+      inputRef.current?.focus()
     }
   }
 
@@ -104,6 +108,7 @@ export default function ChatPanel({ data, onChange }: Props) {
         className="flex-none border-t border-gray-200 p-3 flex gap-2 bg-gray-50"
       >
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
