@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import NDAForm from '@/components/NDAForm'
+import ChatPanel from '@/components/ChatPanel'
 import NDADocument from '@/components/NDADocument'
 import { NDAFormData, defaultFormData } from '@/types/nda'
 
@@ -25,9 +25,9 @@ export default function Home() {
 
       {/* Split panels */}
       <div className="flex-1 overflow-hidden max-w-7xl mx-auto w-full flex print:block print:overflow-visible">
-        {/* Left: Form — hidden when printing */}
-        <div className="no-print w-5/12 overflow-y-auto border-r border-gray-200 bg-gray-50">
-          <NDAForm data={formData} onChange={setFormData} />
+        {/* Left: Chat — hidden when printing */}
+        <div className="no-print w-5/12 flex flex-col border-r border-gray-200 bg-gray-50">
+          <ChatPanel data={formData} onChange={setFormData} />
         </div>
 
         {/* Right: Live preview */}
