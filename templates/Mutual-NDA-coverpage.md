@@ -7,38 +7,38 @@ This Mutual Non-Disclosure Agreement (the "MNDA") consists of: (1) this Cover Pa
 ### Purpose
 <label>How Confidential Information may be used</label>
 
-[Evaluating whether to enter into a business relationship with the other party.]
+<span class="coverpage_link">Purpose</span>
 
 ### Effective Date
-[Today's date]
+<span class="coverpage_link">Effective Date</span>
 
 ### MNDA Term
 <label>The length of this MNDA</label>
-- [x]     Expires [1 year(s)] from Effective Date.
-- [ ]     Continues until terminated in accordance with the terms of the MNDA.
+
+<span class="coverpage_link">MNDA Term</span>
 
 ### Term of Confidentiality
 <label>How long Confidential Information is protected</label>
-- [x]     [1 year(s)] from Effective Date, but in the case of trade secrets until Confidential Information is no longer considered a trade secret under applicable laws.
-- [ ]     In perpetuity.
+
+<span class="coverpage_link">Term of Confidentiality</span>
 
 ### Governing Law & Jurisdiction
-Governing Law: [Fill in state]
+Governing Law: <span class="coverpage_link">Governing Law</span>
 
-Jurisdiction: [Fill in city or county and state, i.e. "courts located in New Castle, DE"]
+Jurisdiction: <span class="coverpage_link">Jurisdiction</span>
 
 ### MNDA Modifications
 List any modifications to the MNDA
 
 By signing this Cover Page, each party agrees to enter into this MNDA as of the Effective Date.
 
-|| PARTY 1 | PARTY 2 |
-|:--- | :----: | :----: |
+| | PARTY 1 | PARTY 2 |
+|:--- | :---- | :---- |
 | Signature | | |
-| Print Name | |
-| Title | | |
-| Company | | |
-| Notice Address <label>Use either email or postal address</label> | | |
-| Date | | |
+| Print Name | <span class="coverpage_link">Party 1 Name</span> | <span class="coverpage_link">Party 2 Name</span> |
+| Title | <span class="coverpage_link">Party 1 Title</span> | <span class="coverpage_link">Party 2 Title</span> |
+| Company | <span class="coverpage_link">Party 1 Company</span> | <span class="coverpage_link">Party 2 Company</span> |
+| Notice Address | <span class="coverpage_link">Party 1 Address</span> | <span class="coverpage_link">Party 2 Address</span> |
+| Date | <span class="coverpage_link">Effective Date</span> | <span class="coverpage_link">Effective Date</span> |
 
 Common Paper Mutual Non-Disclosure Agreement (Version 1.0) free to use under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

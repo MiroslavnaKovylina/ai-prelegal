@@ -158,6 +158,28 @@ const components: Record<string, React.ComponentType<any>> = {
   },
 }
 
+function CollectedFields({ data }: { data: DocumentData }) {
+  const filled = Object.entries(data).filter(([, v]) => v)
+  if (filled.length === 0) return null
+  return (
+    <div className="mb-8 border border-blue-100 rounded-lg overflow-hidden no-print">
+      <div className="bg-blue-50 px-4 py-2 border-b border-blue-100">
+        <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: '#209dd7' }}>
+          Collected Information
+        </span>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3">
+        {filled.map(([k, v]) => (
+          <div key={k}>
+            <div className="text-xs font-medium text-gray-500">{k}</div>
+            <div className="text-sm font-medium text-gray-900">{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function DocumentRenderer({ filename, data }: Props) {
   const [template, setTemplate] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -180,6 +202,7 @@ export default function DocumentRenderer({ filename, data }: Props) {
 
   return (
     <div className="p-10 max-w-3xl mx-auto">
+      <CollectedFields data={data} />
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
