@@ -237,6 +237,24 @@ class ChatTurn(BaseModel):
     fields: dict[str, Optional[str]]
 
 
+def _extract_content(response) -> str:
+    """Return the JSON string from an LLM response regardless of delivery path.
+
+    LiteLLM routes Pydantic response_format through native JSON-schema mode when
+    the provider supports it (content is a string) or falls back to tool-calls
+    (content is None, payload is in tool_calls[0].function.arguments).
+    """
+    msg = response.choices[0].message
+    content = msg.content
+    if content is None:
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            content = tool_calls[0].function.arguments
+    if not content:
+        raise ValueError(f"Empty response from model: {response}")
+    return content
+
+
 def get_chat_response(messages: list[dict], document_type: str) -> ChatTurn:
     system_prompt = DOCUMENT_REGISTRY.get(document_type, _NDA_PROMPT)
     field_names = DOCUMENT_FIELD_NAMES.get(document_type, _NDA)
@@ -254,11 +272,15 @@ def get_chat_response(messages: list[dict], document_type: str) -> ChatTurn:
         reasoning_effort="low",
         extra_body=EXTRA_BODY,
     )
-    result = _ChatTurn.model_validate_json(response.choices[0].message.content)
-    # Serialise with aliases so keys match template span names exactly
+
+    content = _extract_content(response)
+    print(f"[AI] raw={content[:300]}", flush=True)
+
+    result = _ChatTurn.model_validate_json(content)
     non_null = {
         k: v
         for k, v in result.fields.model_dump(by_alias=True).items()
         if v is not None
     }
+    print(f"[AI] fields={non_null}", flush=True)
     return ChatTurn(message=result.message, fields=non_null)

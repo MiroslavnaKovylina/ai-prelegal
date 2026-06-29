@@ -20,7 +20,13 @@ function escapeHtml(s: string) {
 }
 
 function normalizeKey(k: string) {
-  return k.toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim()
+  // Split camelCase, then strip all whitespace/separators and lowercase.
+  // "effectiveDate" → "effectivedate", "Effective Date" → "effectivedate",
+  // "effective_date" → "effectivedate", "Party 1 Name" → "party1name"
+  return k
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/[\s\-_.]+/g, '')
 }
 
 function substituteFields(template: string, data: DocumentData): string {
