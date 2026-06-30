@@ -4,7 +4,7 @@
 
 This is a SaaS product to allow users to draft legal agreements based on templates in the templates directory. The user interacts via AI chat to fill in document fields, and sees a live document preview that updates as fields are collected. The available documents are defined in `catalog.json` at the project root.
 
-The current implementation (PL-6) is a Dockerised full-stack app with a FastAPI backend, SQLite database, and statically-built Next.js frontend. It supports all 12 document types with full AI chat and live document preview. There is a fake login screen (no real auth).
+The current implementation (PL-7) is a Dockerised full-stack app with a FastAPI backend, SQLite database, and statically-built Next.js frontend. It supports all 12 document types with full AI chat, live document preview, real user authentication, and per-user document history with continue-editing support.
 
 ## Development process
 
@@ -26,17 +26,32 @@ There is an OPENROUTER_API_KEY in the .env file in the project root.
 
 The entire project is packaged into a Docker container (multi-stage build: Node 20 Alpine builds the frontend, Python 3.12-slim runs the backend).
 
-The backend is in `backend/` — a uv project using FastAPI. It serves the statically-built Next.js frontend via `StaticFiles(html=True)` and initialises a fresh SQLite database (`data/prelegal.db`, users table) on each container start-up. Key API endpoints:
+The backend is in `backend/` — a uv project using FastAPI. It serves the statically-built Next.js frontend via `StaticFiles(html=True)` and initialises a fresh SQLite database (`data/prelegal.db`) on each container start-up. The DB is ephemeral — it resets on restart by design. Key tables: `users` (id, email, password_hash), `documents` (id, user_id, document_type, catalog_name, fields JSON, messages JSON, timestamps).
 
+Auth uses PBKDF2-HMAC-SHA256 password hashing (`backend/auth.py`) and PyJWT Bearer tokens. All `/api/chat` and `/api/documents` endpoints require a valid token.
+
+Key API endpoints:
+
+- `POST /api/auth/register` — create account, returns `{ token, email }`
+- `POST /api/auth/login` — returns `{ token, email }`
 - `GET /api/catalog` — returns the catalog with derived `id` fields
 - `GET /api/templates/{filename}` — serves raw template markdown
-- `POST /api/chat` — runs AI chat for a given `document_type`, returns `{ message, fields }`
+- `POST /api/chat` — AI chat for a given `document_type`, returns `{ message, fields }` (auth required)
+- `GET /api/documents` — list current user's saved documents (auth required)
+- `POST /api/documents` — create a document (auth required)
+- `PUT /api/documents/{id}` — update fields + messages (auth required)
+- `DELETE /api/documents/{id}` — delete a document (auth required)
+
+The Dockerfile runs `.venv/bin/uvicorn` directly (not `uv run`) so the container starts instantly with no PyPI network call.
 
 The frontend is in `frontend/` — Next.js with App Router, Tailwind v4, `output: "export"` and `trailingSlash: true` for static export. The built files land in `frontend/out/` and are copied into `backend/static/` inside the Docker image. Key components:
 
-- `src/app/page.tsx` — landing page (catalog card grid) and split chat+preview view
-- `src/components/ChatPanel.tsx` — AI chat; posts `{ messages, document_type }` to `/api/chat` and calls `onChange(fields)` on each response
-- `src/components/DocumentRenderer.tsx` — fetches template markdown, runs `substituteFields()` to replace `<span class="*_link">FieldName</span>` placeholders with values or yellow `<mark>` highlights, renders with `react-markdown` + `remark-gfm` + `rehype-raw`
+- `src/app/page.tsx` — auth guard (redirects to `/login/` if no token), landing page with "My Documents" history + catalog grid, split chat+preview view
+- `src/app/login/page.tsx` — real sign-in form, calls `/api/auth/login`
+- `src/app/register/page.tsx` — sign-up form with password confirmation, calls `/api/auth/register`
+- `src/lib/auth.ts` — token helpers: `getToken()`, `getEmail()`, `saveSession()`, `clearSession()`, `authHeaders()` (returns `Authorization: Bearer <token>` header)
+- `src/components/ChatPanel.tsx` — AI chat; auto-saves to `/api/documents` after first AI response (creates), then PUTs on every subsequent turn; accepts `initialMessages` to restore history for continue-editing
+- `src/components/DocumentRenderer.tsx` — fetches template markdown, runs `substituteFields()` to replace `<span class="*_link">FieldName</span>` placeholders with values or yellow `<mark>` highlights, renders with `react-markdown` + `remark-gfm` + `rehype-raw`; shows draft disclaimer banner
 - `src/types/document.ts` — `DocumentData = Record<string, string | undefined>`, `CatalogEntry`
 
 Start/stop scripts are in `scripts/`:
@@ -55,7 +70,7 @@ scripts/start-windows.ps1
 scripts/stop-windows.ps1
 ```
 
-The app runs on port 8000. `http://localhost:8000/login/` is the login page (fake — no auth, redirects to `/`). `http://localhost:8000/` is the platform.
+The app runs on port 8000. `http://localhost:8000/login/` is the sign-in page. `http://localhost:8000/register/` is the sign-up page. `http://localhost:8000/` is the platform (redirects to login if not authenticated).
 
 ## Template system
 
