@@ -89,9 +89,12 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={goBack}
-                className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:border-gray-400 hover:text-gray-800 hover:bg-gray-50 transition-all"
               >
-                ← Back
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+                Back
               </button>
               <div>
                 <h1 className="text-xl font-semibold leading-tight" style={{ color: '#032147' }}>
