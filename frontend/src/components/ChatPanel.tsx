@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DocumentData } from '@/types/document'
+import { authHeaders } from '@/lib/auth'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -11,7 +12,11 @@ interface Message {
 interface Props {
   data: DocumentData
   documentType: string
+  catalogName: string
+  documentId: number | null
+  initialMessages?: Message[]
   onChange: (data: DocumentData) => void
+  onDocumentCreated: (id: number) => void
 }
 
 function merge(current: DocumentData, patch: Record<string, unknown>): DocumentData {
@@ -32,18 +37,25 @@ function merge(current: DocumentData, patch: Record<string, unknown>): DocumentD
   return next
 }
 
-export default function ChatPanel({ data, documentType, onChange }: Props) {
-  const [messages, setMessages] = useState<Message[]>([])
+export default function ChatPanel({
+  data, documentType, catalogName, documentId,
+  initialMessages, onChange, onDocumentCreated,
+}: Props) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? [])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const dataRef = useRef(data)
+  const docIdRef = useRef(documentId)
 
   useEffect(() => { dataRef.current = data }, [data])
+  useEffect(() => { docIdRef.current = documentId }, [documentId])
 
   useEffect(() => {
-    post([])
+    if (!initialMessages || initialMessages.length === 0) {
+      post([])
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -51,17 +63,42 @@ export default function ChatPanel({ data, documentType, onChange }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  async function saveDocument(msgs: Message[], fields: DocumentData) {
+    if (docIdRef.current === null) {
+      // Create new document
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ document_type: documentType, catalog_name: catalogName, fields, messages: msgs }),
+      })
+      if (res.ok) {
+        const doc = await res.json()
+        docIdRef.current = doc.id
+        onDocumentCreated(doc.id)
+      }
+    } else {
+      await fetch(`/api/documents/${docIdRef.current}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ fields, messages: msgs }),
+      })
+    }
+  }
+
   async function post(msgs: Message[]) {
     setLoading(true)
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ messages: msgs, document_type: documentType }),
       })
       const { message, fields } = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: message }])
-      onChange(merge(dataRef.current, fields))
+      const updatedMsgs = [...msgs, { role: 'assistant' as const, content: message }]
+      setMessages(updatedMsgs)
+      const updatedData = merge(dataRef.current, fields)
+      onChange(updatedData)
+      await saveDocument(updatedMsgs, updatedData)
     } finally {
       setLoading(false)
       inputRef.current?.focus()
