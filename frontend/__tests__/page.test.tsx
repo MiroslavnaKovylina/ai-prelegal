@@ -3,6 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Home from '@/app/page'
 
+// Mock Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}))
+
 // Mock DocumentRenderer to avoid ESM issues with react-markdown in Jest
 jest.mock('@/components/DocumentRenderer', () => ({
   __esModule: true,
@@ -31,32 +36,32 @@ const CATALOG = [
 const GREETING = "Hello! I'll help you fill out this document. What is the purpose of this agreement?"
 
 function makeChatResponse(fields: Record<string, string | null> = {}) {
-  return {
-    json: jest.fn().mockResolvedValue({ message: GREETING, fields }),
-  }
-}
-
-function makeCatalogResponse() {
-  return {
-    json: jest.fn().mockResolvedValue(CATALOG),
-  }
+  return { json: jest.fn().mockResolvedValue({ message: GREETING, fields }) }
 }
 
 function mockFetch(chatFields: Record<string, string | null> = {}) {
   ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
-    if (url === '/api/catalog') return Promise.resolve(makeCatalogResponse())
+    if (url === '/api/catalog') return Promise.resolve({ json: jest.fn().mockResolvedValue(CATALOG) })
+    if (url === '/api/documents') return Promise.resolve({ ok: true, status: 200, json: jest.fn().mockResolvedValue([]) })
     if (url === '/api/chat') return Promise.resolve(makeChatResponse(chatFields))
+    if (url.startsWith('/api/documents/')) return Promise.resolve({ ok: true, status: 200, json: jest.fn().mockResolvedValue({ id: 1, fields: {}, messages: [] }) })
+    // POST /api/documents
+    if (url === '/api/documents') return Promise.resolve({ ok: true, status: 201, json: jest.fn().mockResolvedValue({ id: 1, fields: {}, messages: [] }) })
     return Promise.reject(new Error(`Unexpected fetch: ${url}`))
   })
 }
 
 beforeEach(() => {
   global.fetch = jest.fn() as jest.Mock
+  // Set auth so the page doesn't redirect to login
+  localStorage.setItem('prelegal_email', 'test@example.com')
+  localStorage.setItem('prelegal_token', 'fake-token')
   mockFetch()
 })
 
 afterEach(() => {
   jest.resetAllMocks()
+  localStorage.clear()
 })
 
 describe('Landing page', () => {
@@ -75,10 +80,12 @@ describe('Landing page', () => {
     )
   })
 
-  it('shows loading state before catalog loads', () => {
-    ;(global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {}))
+  it('shows user email and sign out button', async () => {
     render(<Home />)
-    expect(screen.getByText('Loading documents…')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByText('test@example.com')).toBeInTheDocument()
+    )
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 })
 
@@ -88,7 +95,7 @@ describe('Document selection', () => {
     render(<Home />)
     await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
 
-    await user.click(screen.getByText('Mutual Non-Disclosure Agreement'))
+    await user.click(screen.getAllByText('Mutual Non-Disclosure Agreement')[0])
 
     await waitFor(() =>
       expect(screen.getByText(GREETING)).toBeInTheDocument()
@@ -102,7 +109,7 @@ describe('Document selection', () => {
     render(<Home />)
     await waitFor(() => screen.getByText('Mutual Non-Disclosure Agreement'))
 
-    await user.click(screen.getByText('Mutual Non-Disclosure Agreement'))
+    await user.click(screen.getAllByText('Mutual Non-Disclosure Agreement')[0])
 
     await waitFor(() =>
       expect(
@@ -162,12 +169,10 @@ describe('Chat in document view', () => {
   it('passes field values down to the document renderer', async () => {
     const user = userEvent.setup()
     ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url === '/api/catalog') return Promise.resolve(makeCatalogResponse())
-      if (url === '/api/chat') {
-        return Promise.resolve(
-          makeChatResponse({ 'Governing Law': 'Nevada' })
-        )
-      }
+      if (url === '/api/catalog') return Promise.resolve({ json: jest.fn().mockResolvedValue(CATALOG) })
+      if (url === '/api/documents') return Promise.resolve({ ok: true, status: 200, json: jest.fn().mockResolvedValue([]) })
+      if (url === '/api/chat') return Promise.resolve({ json: jest.fn().mockResolvedValue({ message: GREETING, fields: { 'Governing Law': 'Nevada' } }) })
+      if (url.startsWith('/api/documents')) return Promise.resolve({ ok: true, status: 201, json: jest.fn().mockResolvedValue({ id: 1, fields: {}, messages: [] }) })
       return Promise.reject(new Error(`Unexpected fetch: ${url}`))
     })
 
